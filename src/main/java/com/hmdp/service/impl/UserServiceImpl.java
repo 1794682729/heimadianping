@@ -11,11 +11,13 @@ import com.hmdp.entity.User;
 import com.hmdp.mapper.UserMapper;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RegexUtils;
+import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 
 import java.util.HashMap;
@@ -67,6 +69,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         if (code==null ||! code.equals(loginFormCode)) {
             return Result.fail("验证码错误");
         }
+        //如果验证码验证成功，则立即删除此验证码防止验证码重复使用
+        stringRedisTemplate.delete(key);
         User user = query().eq("phone", loginForm.getPhone()).one();
         if (user==null) {
             //如果用户不存在，创建新用户并保存
@@ -86,6 +90,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         stringRedisTemplate.expire(tokenKey,LOGIN_USER_TTL, TimeUnit.MINUTES);
 //        session.setAttribute("user", BeanUtil.copyProperties(user,UserDTO.class));
         return Result.ok(token);
+    }
+
+    @Override
+    public Result logout(HttpServletRequest request) {
+        String token= request.getHeader("authorization");
+        String key = LOGIN_USER_KEY+token;
+        stringRedisTemplate.delete(key);
+
+        return Result.ok();
     }
 
     private User CreateByPhone(String phone) {
